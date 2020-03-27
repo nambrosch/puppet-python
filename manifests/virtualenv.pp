@@ -2,23 +2,24 @@
 # @summary Creates Python virtualenv.
 #
 # @param ensure
-# @param version Python version to use.
-# @param requirements Path to pip requirements.txt file
-# @param systempkgs Copy system site-packages into virtualenv.
-# @param venv_dir  Directory to install virtualenv to
+# @param version         Python version to use.
+# @param requirements    Path to pip requirements.txt file
+# @param systempkgs      Copy system site-packages into virtualenv.
+# @param venv_dir        Directory to install virtualenv to
 # @param ensure_venv_dir Create $venv_dir
-# @param distribute Include distribute in the virtualenv
-# @param index Base URL of Python package index
-# @param owner The owner of the virtualenv being manipulated
-# @param group  The group relating to the virtualenv being manipulated
-# @param mode  Optionally specify directory mode
-# @param proxy Proxy server to use for outbound connections
-# @param environment Additional environment variables required to install the packages
-# @param path  Specifies the PATH variable
-# @param cwd The directory from which to run the "pip install" command
-# @param timeout  The maximum time in seconds the "pip install" command should take
-# @param pip_args  Arguments to pass to pip during initialization
-# @param extra_pip_args Extra arguments to pass to pip after requirements file
+# @param distribute      Include distribute in the virtualenv
+# @param index           Base URL of Python package index
+# @param owner           The owner of the virtualenv being manipulated
+# @param group           The group relating to the virtualenv being manipulated
+# @param mode            Optionally specify directory mode
+# @param allow_binaries  Allow binary packages to be used
+# @param proxy           Proxy server to use for outbound connections
+# @param environment     Additional environment variables required to install the packages
+# @param path            Specifies the PATH variable
+# @param cwd             The directory from which to run the "pip install" command
+# @param timeout         The maximum time in seconds the "pip install" command should take
+# @param pip_args        Arguments to pass to pip during initialization
+# @param extra_pip_args  Extra arguments to pass to pip after requirements file
 #
 # @example install a virtual env at /var/www/project1
 #  python::virtualenv { '/var/www/project1':
@@ -31,25 +32,26 @@
 #  }
 #
 define python::virtualenv (
-  $ensure                          = 'present',
-  $version                         = 'system',
-  $requirements                    = false,
-  $systempkgs                      = false,
-  $venv_dir                        = $name,
-  $ensure_venv_dir                 = true,
-  $distribute                      = true,
-  $index                           = false,
-  $owner                           = 'root',
-  $group                           = 'root',
-  $mode                            = '0755',
-  Optional[Stdlib::HTTPUrl] $proxy = undef,
-  $environment                     = [],
-  $path                            = [ '/bin', '/usr/bin', '/usr/sbin', '/usr/local/bin' ],
-  $cwd                             = undef,
-  $timeout                         = 1800,
-  $pip_args                        = '',
-  $extra_pip_args                  = '',
-  $virtualenv                      = undef,
+  $ensure                           = 'present',
+  $version                          = 'system',
+  $requirements                     = false,
+  $systempkgs                       = false,
+  $venv_dir                         = $name,
+  $ensure_venv_dir                  = true,
+  $distribute                       = true,
+  $index                            = false,
+  $owner                            = 'root',
+  $group                            = 'root',
+  $mode                             = '0755',
+  Optional[Boolean] $allow_binaries = false,
+  Optional[Stdlib::HTTPUrl] $proxy  = undef,
+  $environment                      = [],
+  $path                             = [ '/bin', '/usr/bin', '/usr/sbin', '/usr/local/bin' ],
+  $cwd                              = undef,
+  $timeout                          = 1800,
+  $pip_args                         = '',
+  $extra_pip_args                   = '',
+  $virtualenv                       = undef,
 ) {
   include python
   $python_provider = getparam(Class['python'], 'provider')
@@ -136,6 +138,12 @@ define python::virtualenv (
     $pip_cmd   = "${python::exec_prefix}${venv_dir}/bin/pip"
     $pip_flags = "${pypi_index} ${proxy_flag} ${pip_args}"
 
+    if $allow_binaries == true {
+      $no_binary_flag = ''
+    } else {
+      $no_binary_flag = '--no-binary :all:'
+    }
+
     exec { "python_virtualenv_${venv_dir}":
       command     => "${virtualenv_cmd} ${system_pkgs_flag} -p ${python} ${venv_dir} && ${pip_cmd} --log ${venv_dir}/pip.log install ${pip_flags} --upgrade pip && ${pip_cmd} install ${pip_flags} --upgrade ${distribute_pkg}",
       user        => $owner,
@@ -149,7 +157,7 @@ define python::virtualenv (
 
     if $requirements {
       exec { "python_requirements_initial_install_${requirements}_${venv_dir}":
-        command     => "${pip_cmd} --log ${venv_dir}/pip.log install ${pypi_index} ${proxy_flag} --no-binary :all: -r ${requirements} ${extra_pip_args}",
+        command     => "${pip_cmd} --log ${venv_dir}/pip.log install ${pypi_index} ${proxy_flag} ${no_binary_flag} -r ${requirements} ${extra_pip_args}",
         refreshonly => true,
         timeout     => $timeout,
         user        => $owner,
